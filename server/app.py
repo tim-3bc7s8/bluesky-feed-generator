@@ -14,6 +14,7 @@ from atproto import Client as BskyClient
 # from server.algos import algos
 from server.data_filter import operations_callback
 from server.database import init_db
+from server import followed_users
 
 
 # --- Pre-flight Checks ---
@@ -56,20 +57,25 @@ print("Pre-flight checks passed. Starting application...")
 # --- End of Pre-flight Checks ---
 
 
+# Pre-populate the followed users list before starting threads
+followed_users._fetch_and_update_followed_users()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app) # Needed for local testing with browsers
 
 stream_stop_event = threading.Event()
 stream_thread = threading.Thread(
     target=data_stream.run, args=(config.SERVICE_DID, operations_callback, stream_stop_event,)
 )
 stream_thread.start()
-
+# Start the thread to update the list of followed users
+follower_update_stop_event = followed_users.start_follower_update_thread()
 
 def sigint_handler(*_):
     print('Stopping data stream...')
     stream_stop_event.set()
+    print('Stopping follower update thread...')
+    follower_update_stop_event.set()
     sys.exit(0)
 
 
@@ -139,7 +145,7 @@ def get_feed_skeleton():
 
     return jsonify(body)
 
-# --- NEW ENDPOINT FOR LOCAL VISUAL TESTING ---
+# ENDPOINT FOR LOCAL VISUAL TESTING
 @app.route('/get-feed-with-details', methods=['GET'])
 def get_feed_with_details():
     HANDLE = os.environ.get('HANDLE')

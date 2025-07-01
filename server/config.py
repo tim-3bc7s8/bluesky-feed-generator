@@ -11,6 +11,9 @@ SERVICE_DID = os.environ.get('SERVICE_DID')
 HOSTNAME = os.environ.get('HOSTNAME')
 FLASK_RUN_FROM_CLI = os.environ.get('FLASK_RUN_FROM_CLI')
 
+PASSWORD = os.environ.get('PASSWORD')
+HANDLE = os.environ.get('HANDLE')
+
 if FLASK_RUN_FROM_CLI:
     logger.setLevel(logging.DEBUG)
 

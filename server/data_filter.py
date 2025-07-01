@@ -7,6 +7,7 @@ from atproto import models
 from server import config
 from server.logger import logger
 from server.database import db, Post
+from server.followed_users import FOLLOWED_DIDS
 
 
 def is_archive_post(record: 'models.AppBskyFeedPost.Record') -> bool:
@@ -70,8 +71,21 @@ def operations_callback(ops: defaultdict) -> None:
         if should_ignore_post(created_post):
             continue
 
-        # only python-related posts
-        if 'python' in record.text.lower():
+###########################################################
+# Filter conditions                                       #
+###########################################################
+
+        # Condition 1: Is the author someone we follow?
+        is_from_followed_user = author in FOLLOWED_DIDS
+
+        # Condition 2: Does the post contain the word "python"?
+        contains_python = 'python' in record.text.lower()
+
+        # Condition 3: Is the post in English?
+        is_english = record.langs and 'en' in record.langs
+
+        # --- Apply the combined "OR" filter ---
+        if is_from_followed_user or (contains_python and is_english):
             reply_root = reply_parent = None
             if record.reply:
                 reply_root = record.reply.root.uri
@@ -84,6 +98,10 @@ def operations_callback(ops: defaultdict) -> None:
                 'reply_root': reply_root,
             }
             posts_to_create.append(post_dict)
+
+###########################################################
+# End of filter conditions                                #
+###########################################################
 
     posts_to_delete = ops[models.ids.AppBskyFeedPost]['deleted']
     if posts_to_delete:
