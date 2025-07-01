@@ -1,5 +1,8 @@
 import logging
 from collections import defaultdict
+import os
+import sys
+from server.database import init_db
 
 from atproto import AtUri, CAR, firehose_models, FirehoseSubscribeReposClient, models, parse_subscribe_repos_message
 from atproto.exceptions import FirehoseError

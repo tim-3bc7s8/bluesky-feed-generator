@@ -22,9 +22,9 @@ if not SERVICE_DID:
 
 
 FEED_URI = os.environ.get('FEED_URI')
-if not FEED_URI:
-    raise RuntimeError('Publish your feed first (run publish_feed.py) to obtain Feed URI. '
-                       'Set this URI to "FEED_URI" environment variable.')
+# if not FEED_URI:
+#     raise RuntimeError('Publish your feed first (run publish_feed.py) to obtain Feed URI. '
+#                        'Set this URI to "FEED_URI" environment variable.')
 
 
 def _get_bool_env_var(value: str) -> bool:

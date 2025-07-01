@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BlueSky Local Feed Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        @import url('https://rsms.me/inter/inter.css');
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-3xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-blue-600">BlueSky Local Feed Viewer</h1>
+            <p class="text-gray-500 mt-2">Visually test your custom feed running on localhost.</p>
+        </header>
+
+        <div class="bg-white p-6 rounded-xl shadow-md mb-8">
+            <div class="mb-4">
+                <label for="feedUri" class="block text-sm font-medium text-gray-700 mb-1">Feed AT URI</label>
+                <input type="text" id="feedUri" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" value="at://did:web:localhost:5000/app.bsky.feed.generator/personal-feed">
+            </div>
+            <button id="fetchButton" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
+                Fetch Feed
+            </button>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loading" class="text-center my-10 hidden">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p class="mt-2 text-gray-600">Fetching posts...</p>
+        </div>
+        
+        <!-- Error Message -->
+        <div id="error" class="text-center my-10 p-4 bg-red-100 text-red-700 rounded-lg hidden"></div>
+
+        <!-- Feed Container -->
+        <div id="feedContainer" class="space-y-6">
+            <!-- Posts will be injected here -->
+        </div>
+        
+        <!-- Load More Button -->
+        <div id="loadMoreContainer" class="text-center mt-8 hidden">
+            <button id="loadMoreButton" class="bg-gray-200 text-gray-700 font-bold py-2 px-6 rounded-md hover:bg-gray-300 transition-colors duration-200">
+                Load More
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        const fetchButton = document.getElementById('fetchButton');
+        const loadMoreButton = document.getElementById('loadMoreButton');
+        const feedContainer = document.getElementById('feedContainer');
+        const loadingIndicator = document.getElementById('loading');
+        const errorDisplay = document.getElementById('error');
+        const loadMoreContainer = document.getElementById('loadMoreContainer');
+        const feedUriInput = document.getElementById('feedUri');
+        
+        let cursor = null;
+
+        const fetchAndRenderFeed = async (isLoadMore = false) => {
+            if (!isLoadMore) {
+                feedContainer.innerHTML = ''; // Clear previous results
+                cursor = null; // Reset cursor for a new fetch
+            }
+            
+            loadingIndicator.classList.remove('hidden');
+            errorDisplay.classList.add('hidden');
+            fetchButton.disabled = true;
+            loadMoreButton.disabled = true;
+
+            const feedUri = feedUriInput.value;
+            let url = `http://localhost:5000/get-feed-with-details?feed=${encodeURIComponent(feedUri)}`;
+            if (isLoadMore && cursor) {
+                url += `&cursor=${encodeURIComponent(cursor)}`;
+            }
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server responded with ${response.status}: ${errorText}`);
+                }
+                const data = await response.json();
+                
+                renderPosts(data.posts);
+                
+                cursor = data.cursor; // Update cursor for the next page
+                if (cursor) {
+                    loadMoreContainer.classList.remove('hidden');
+                } else {
+                    loadMoreContainer.classList.add('hidden');
+                }
+
+            } catch (err) {
+                console.error('Fetch error:', err);
+                errorDisplay.textContent = `Failed to fetch feed. Make sure your local server is running. Error: ${err.message}`;
+                errorDisplay.classList.remove('hidden');
+                loadMoreContainer.classList.add('hidden');
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                fetchButton.disabled = false;
+                loadMoreButton.disabled = false;
+            }
+        };
+
+        const renderPosts = (posts) => {
+            if (!posts || posts.length === 0) {
+                 if (feedContainer.innerHTML === '') { // Only show if no posts were ever loaded
+                    errorDisplay.textContent = 'Feed is empty or no posts were returned.';
+                    errorDisplay.classList.remove('hidden');
+                }
+                return;
+            }
+
+            posts.forEach(post => {
+                const postElement = document.createElement('div');
+                postElement.className = 'bg-white p-5 rounded-xl shadow-md transition-transform transform hover:scale-[1.02]';
+                
+                const author = post.author;
+                const record = post.record;
+                const postUrl = `https://bsky.app/profile/${author.handle}/post/${post.uri.split('/').pop()}`;
+
+                // Sanitize text to prevent HTML injection
+                const sanitizedText = record.text
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+
+                postElement.innerHTML = `
+                    <div class="flex items-center mb-4">
+                        <img src="${author.avatar || 'https://placehold.co/48x48/E2E8F0/A0AEC0?text=?'}" alt="Avatar" class="h-12 w-12 rounded-full mr-4 bg-gray-200">
+                        <div>
+                            <p class="font-bold text-lg">${author.displayName || author.handle}</p>
+                            <p class="text-gray-500 text-sm">@${author.handle}</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-800 whitespace-pre-wrap">${sanitizedText}</p>
+                    <div class="mt-4 text-right">
+                        <a href="${postUrl}" target="_blank" class="text-sm text-blue-500 hover:underline">View on BlueSky</a>
+                    </div>
+                `;
+                feedContainer.appendChild(postElement);
+            });
+        };
+
+        fetchButton.addEventListener('click', () => fetchAndRenderFeed(false));
+        loadMoreButton.addEventListener('click', () => fetchAndRenderFeed(true));
+
+    </script>
+</body>
+</html>
